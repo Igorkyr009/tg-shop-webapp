@@ -3,5 +3,3 @@ pydantic==2.9.2
 python-dotenv==1.0.1
 aiosqlite==0.20.0
 typing-extensions>=4.9.0
-# опционально жёстко зафиксировать aiohttp, если хочешь:
-# aiohttp>=3.12,<3.13.0
