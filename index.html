@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <title>Магазин у Telegram</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin:0; background:#fff; color:#111; }
+    header { padding:16px; font-weight:700; font-size:18px; }
+    .wrap { display:flex; gap:20px; padding:16px; align-items:flex-start; }
+    .grid { flex:2; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:12px; background:#fff; }
+    .card h3 { margin:0 0 8px; font-size:16px; }
+    .card .price { margin:6px 0 10px; font-weight:700; }
+    .card button { width:100%; padding:8px; border-radius:10px; border:1px solid #999; background:#fff; cursor:pointer; }
+    .side { flex:1; min-width:260px; border-left:1px solid #eee; padding-left:16px; position:sticky; top:0; }
+    .side h4 { margin:0 0 8px; }
+    .item { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px dashed #eee; }
+    .totals { margin-top:8px; font-weight:700; }
+    .field { margin:8px 0; display:flex; flex-direction:column; gap:6px; }
+    input { padding:10px; border-radius:10px; border:1px solid #ccc; font-size:14px; }
+    .btn-primary { width:100%; padding:12px; border:none; border-radius:12px; background:#2a8; color:#fff; font-weight:700; cursor:pointer; }
+    .muted { color:#666; font-size:12px; }
+    @media (max-width: 860px) { .wrap { flex-direction:column; } .side { border-left:none; padding-left:0; } }
+  </style>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <header>🛍 Вітрина</header>
+  <div class="wrap">
+    <div class="grid" id="catalog"></div>
+    <aside class="side">
+      <h4>🧺 Кошик</h4>
+      <div id="cart"></div>
+      <div class="totals" id="totals"></div>
+      <div class="field"><label>Місто</label><input id="city" placeholder="Київ" /></div>
+      <div class="field"><label>Відділення НП</label><input id="branch" placeholder="Відділення №25" /></div>
+      <div class="field"><label>Отримувач</label><input id="receiver" placeholder="Іван Іванов" /></div>
+      <div class="field"><label>Телефон</label><input id="phone" placeholder="+380XXXXXXXXX" /></div>
+      <button class="btn-primary" id="checkout">✅ Оформити замовлення</button>
+      <div class="muted">Після натискання замовлення піде у бота.</div>
+    </aside>
+  </div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  // Розгортаємо на всю висоту, підлаштовуємо кольори під тему Telegram
+  tg.expand();
+  const theme = tg.themeParams || {};
+  document.body.style.background = theme.bg_color || '#fff';
+  document.body.style.color = theme.text_color || '#111';
+
+  // Каталог (SKU мають збігатися з ботом)
+  const CATALOG = {
+    "coffee_1kg": {title:"Кава в зернах 1 кг", price:1299, currency:"UAH"},
+    "mug_brand":  {title:"Брендова кружка",     price:299,  currency:"UAH"}
+  };
+
+  const cart = {}; // {sku: qty}
+
+  function renderCatalog(){
+    const grid = document.getElementById('catalog');
+    grid.innerHTML = '';
+    Object.entries(CATALOG).forEach(([sku, p])=>{
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = \`
+        <h3>\${p.title}</h3>
+        <div class="price">\${p.price} \${p.currency}</div>
+        <button data-sku="\${sku}">Додати в кошик</button>
+      \`;
+      el.querySelector('button').onclick = ()=> addToCart(sku, 1);
+      grid.appendChild(el);
+    });
+  }
+
+  function addToCart(sku, qty){
+    cart[sku] = (cart[sku]||0) + qty;
+    renderCart();
+  }
+
+  function removeFromCart(sku){
+    delete cart[sku];
+    renderCart();
+  }
+
+  function renderCart(){
+    const box = document.getElementById('cart');
+    const totals = document.getElementById('totals');
+    box.innerHTML = '';
+    let total = 0, currency = 'UAH';
+    Object.entries(cart).forEach(([sku, qty])=>{
+      const p = CATALOG[sku]; if(!p) return;
+      total += p.price * qty; currency = p.currency;
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.innerHTML = \`<div>\${p.title} × \${qty}</div><div>\${p.price*qty} \${currency} <a href="#" data-rm="\${sku}">✖</a></div>\`;
+      row.querySelector('a').onclick = (e)=>{e.preventDefault(); removeFromCart(sku);};
+      box.appendChild(row);
+    });
+    totals.textContent = \`Разом: \${total} \${currency}\`;
+  }
+
+  document.getElementById('checkout').onclick = ()=>{
+    const items = Object.entries(cart).map(([sku, qty])=>({sku, qty}));
+    if(items.length===0){ alert('Кошик порожній'); return; }
+    const city = document.getElementById('city').value.trim();
+    const branch = document.getElementById('branch').value.trim();
+    const receiver = document.getElementById('receiver').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    if(!city || !branch || !receiver || !phone){
+      alert('Заповніть місто, відділення, імʼя та телефон');
+      return;
+    }
+    const payload = { type:"checkout", items, city, branch, receiver, phone };
+    tg.sendData(JSON.stringify(payload)); // відправляємо у бота як web_app_data
+    tg.close();
+  };
+
+  renderCatalog();
+  renderCart();
+</script>
+</body>
+</html>
